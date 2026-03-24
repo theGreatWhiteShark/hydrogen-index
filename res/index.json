@@ -1,0 +1,95 @@
+{
+  "version": "0.1.0",
+  "created": "2026-03-24T21:20:00",
+  "formed": 2016,
+  "patternCount": 1,
+  "songCount": 1,
+  "drumkitCount": 1,
+  "playlistCount": 1,
+  "themeCount": 1,
+  "patterns": [
+    {
+      "type": "pattern",
+      "name": "Example Pattern",
+      "version": 1,
+      "formatVersion": 1,
+      "tags": [
+        "Ufta",
+        "Punk",
+        "Ambient"
+      ],
+      "size": 3564,
+      "license": "CC0",
+      "notes": 35,
+      "instrumentTypes": [
+        "Kick",
+        "Snare",
+        "Hihat"
+      ]
+    }
+  ],
+  "songs": [
+    {
+      "type": "song",
+      "name": "Example Song",
+      "version": 4,
+      "formatVersion": 1,
+      "tags": [],
+      "size": 79463,
+      "license": "CC0",
+      "patterns": 10
+    }
+  ],
+  "drumkits": [
+    {
+      "type": "drumkit",
+      "name": "Example Drumkit",
+      "version": 1,
+      "formatVersion": 2,
+      "tags": [
+        "GM Midi",
+        "Rock"
+      ],
+      "size": 864397,
+      "license": "CC0",
+      "instruments": 12,
+      "components": 16,
+      "samples": 164,
+      "instrumentTypes": [
+        "Kick",
+        "Snare",
+        "Hihat",
+        "Crash",
+        "Crash 2",
+        "Tom Low"
+      ]
+    }
+  ],
+  "playlists": [
+    {
+      "type": "playlist",
+      "name": "Example Playlist",
+      "version": 1,
+      "formatVersion": 1,
+      "tags": [
+        "Live set"
+      ],
+      "size": 4388,
+      "license": "CC0",
+      "songs": 6
+    }
+  ],
+  "themes": [
+    {
+      "type": "theme",
+      "name": "Example Theme",
+      "version": 1,
+      "formatVersion": 2,
+      "tags": [
+        "Dark"
+      ],
+      "size": 16487,
+      "license": "CC0"
+    }
+  ]
+}
