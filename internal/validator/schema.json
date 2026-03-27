@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["version", "created", "patternCount", "songCount", "drumkitCount", "patterns", "songs", "drumkits"],
+  "properties": {
+    "version": { "type": "string" },
+    "created": { "type": "string" },
+    "patternCount": { "type": "integer", "minimum": 0 },
+    "songCount": { "type": "integer", "minimum": 0 },
+    "drumkitCount": { "type": "integer", "minimum": 0 },
+    "hash": { "type": "string" },
+    "patterns": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/pattern" }
+    },
+    "songs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/song" }
+    },
+    "drumkits": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/drumkit" }
+    }
+  },
+  "$defs": {
+    "sharedFields": {
+      "type": "object",
+      "required": ["type", "name", "url", "hash", "author", "description", "version", "formatVersion", "tags", "size", "license"],
+      "properties": {
+        "type": { "type": "string", "enum": ["pattern", "song", "drumkit"] },
+        "name": { "type": "string" },
+        "url": { "type": "string" },
+        "hash": { "type": "string" },
+        "author": { "type": "string" },
+        "description": { "type": "string" },
+        "version": { "type": "integer", "minimum": 0 },
+        "formatVersion": { "type": "integer", "minimum": 0 },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "size": { "type": "integer", "minimum": 0 },
+        "license": { "type": "string" }
+      }
+    },
+    "pattern": {
+      "allOf": [
+        { "$ref": "#/$defs/sharedFields" },
+        {
+          "type": "object",
+          "required": ["notes", "instrumentTypes"],
+          "properties": {
+            "type": { "const": "pattern" },
+            "notes": { "type": "integer", "minimum": 0 },
+            "instrumentTypes": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      ]
+    },
+    "song": {
+      "allOf": [
+        { "$ref": "#/$defs/sharedFields" },
+        {
+          "type": "object",
+          "required": ["patterns"],
+          "properties": {
+            "type": { "const": "song" },
+            "patterns": { "type": "integer", "minimum": 0 }
+          }
+        }
+      ]
+    },
+    "drumkit": {
+      "allOf": [
+        { "$ref": "#/$defs/sharedFields" },
+        {
+          "type": "object",
+          "required": ["instruments", "components", "samples", "instrumentTypes"],
+          "properties": {
+            "type": { "const": "drumkit" },
+            "instruments": { "type": "integer", "minimum": 0 },
+            "components": { "type": "integer", "minimum": 0 },
+            "samples": { "type": "integer", "minimum": 0 },
+            "instrumentTypes": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      ]
+    }
+  }
+}
