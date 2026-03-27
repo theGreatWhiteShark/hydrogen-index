@@ -67,18 +67,6 @@ Number of drumkit blocks in the **drumkits** list. Might be utilized for
 consistency checks and/or to display a progress bar while parsing the index file
 in `hydrogen`.
 
-#### playlistCount
-
-Number of playlist blocks in the **playlists** list. Might be utilized for
-consistency checks and/or to display a progress bar while parsing the index file
-in `hydrogen`.
-
-#### themeCount
-
-Number of theme blocks in the **themes** list. Might be utilized for
-consistency checks and/or to display a progress bar while parsing the index file
-in `hydrogen`.
-
 #### patterns
 
 List of pattern blocks.
@@ -90,14 +78,6 @@ List of song blocks.
 #### drumkits
 
 List of drumkit blocks.
-
-#### playlists
-
-List of playlist blocks.
-
-#### themes
-
-List of theme blocks.
 
 #### hash
 
@@ -195,10 +175,6 @@ Note that no nodes regarding the drumkit image or image license are contained.
 This feature is almost never used in drumkits I encountered and I do not see how
 it would add valuable information. Plus, we would have to make room displaying
 the image for in the download dialog in `hydrogen`.
-
-#### playlist block
-
-- **songs**: number of songs in the playlist.
 
 ## Consequences
 

@@ -9,12 +9,11 @@ deciders: phil (theGreatWhiteShark)
 ## Context and Problem Statement
 
 In `hydrogen` we provide a couple of custom XML file formats for data exchange:
-`.h2song`, `.h2pattern`, `.h2playlist`, `.h2drumkit` (tar archive containing
-`drumkit.xml` as well as samples), `.h2theme`, and `.h2map`). As of now - prior
-to version 2.0 of Hydrogen - only `.h2drumkit` files are commonly shared via the
-internet. To ease exchange, there is a custom widget in `hydrogen` serving as a
-frontend for a curated list of drumkits we - the Hydrogen dev team - do host at
-SourceForge.
+`.h2song`, `.h2pattern`, and `.h2drumkit` (tar archive containing `drumkit.xml`
+as well as samples). As of now - prior to version 2.0 of Hydrogen - only
+`.h2drumkit` files are commonly shared via the internet. To ease exchange, there
+is a custom widget in `hydrogen` serving as a frontend for a curated list of
+drumkits we - the Hydrogen dev team - do host at SourceForge.
 
 If a users wishes to share her own kits with other people, she has to host an
 XML index file using the same structure as our
