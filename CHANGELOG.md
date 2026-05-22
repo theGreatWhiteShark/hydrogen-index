@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+
+- `folderName` field for drumkit entries in index.json (extracted from `.h2drumkit` tar archive structure)
+- `.h2drumkit` files are now only accepted in case they contain exactly one
+  top-level folder.
+
 ## [0.1.0] - 2026-03-27
 
 ### Added

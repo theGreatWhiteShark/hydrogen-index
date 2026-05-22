@@ -164,6 +164,11 @@ Some artifact blocks will contain additional nodes.
 
 #### drumkit block
 
+- **folderName**: `.h2drumkit` files are tar archives containing a folder with
+  all data relevant for the drumkit. In order to be able to check for the
+  existence of the artifact locally or compare its version, we have to know to
+  which path it will be extracted. Sometimes folder name and drumkit name do
+  differ.
 - **instruments**: number of instruments in the drumkit.
 - **components**: number of instrument components in the drumkit.
 - **samples**: number of samples in the drumkit.

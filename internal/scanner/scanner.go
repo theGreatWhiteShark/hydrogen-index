@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hydrogen-music/hydrogen-index/internal/parser"
 )
@@ -145,22 +146,74 @@ func parseDrumkitTar(path, root string) (*ArtifactFile, error) {
 	}, nil
 }
 
-// findAndParseDrumkitXML walks tar entries looking for drumkit.xml at any depth
-// and parses it. The first matching entry wins.
+// findAndParseDrumkitXML walks tar entries, validates that all entries reside
+// under exactly one top-level folder, extracts drumkit.xml, and parses it.
+// The folder name is stored in the returned DrumkitMetadata.FolderName.
+//
+// Validation rules:
+//   - Every entry must be inside a top-level folder (no root-level files)
+//   - There must be exactly one top-level folder across all entries
+//   - drumkit.xml must be present somewhere in the archive
 func findAndParseDrumkitXML(r io.Reader) (interface{}, error) {
 	tr := tar.NewReader(r)
+	topLevelFolders := make(map[string]struct{})
+	var drumkitData []byte
+
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
-			return nil, fmt.Errorf("drumkit.xml not found in archive")
+			break
 		}
 		if err != nil {
 			return nil, fmt.Errorf("reading tar: %w", err)
 		}
-		if filepath.Base(hdr.Name) == "drumkit.xml" {
-			return parser.ParseDrumkit(tr)
+
+		// Determine the top-level folder for this entry.
+		slashIdx := strings.Index(hdr.Name, "/")
+		if slashIdx == -1 {
+			// Entry is at root level (no containing folder).
+			return nil, fmt.Errorf("archive contains top-level entry %q; expected all entries within a single top-level folder", hdr.Name)
+		}
+		topLevelFolders[hdr.Name[:slashIdx]] = struct{}{}
+
+		// Buffer drumkit.xml content for later parsing.
+		if filepath.Base(hdr.Name) == "drumkit.xml" && hdr.Typeflag == tar.TypeReg {
+			drumkitData, err = io.ReadAll(tr)
+			if err != nil {
+				return nil, fmt.Errorf("reading drumkit.xml: %w", err)
+			}
 		}
 	}
+
+	// Validate exactly one top-level folder.
+	if len(topLevelFolders) == 0 {
+		return nil, fmt.Errorf("archive is empty")
+	}
+	if len(topLevelFolders) > 1 {
+		folders := make([]string, 0, len(topLevelFolders))
+		for name := range topLevelFolders {
+			folders = append(folders, name)
+		}
+		return nil, fmt.Errorf("archive contains %d top-level folders (%s); expected exactly one",
+			len(topLevelFolders), strings.Join(folders, ", "))
+	}
+
+	// Extract the folder name.
+	var folderName string
+	for name := range topLevelFolders {
+		folderName = name
+	}
+
+	if drumkitData == nil {
+		return nil, fmt.Errorf("drumkit.xml not found in archive")
+	}
+
+	meta, err := parser.ParseDrumkit(bytes.NewReader(drumkitData))
+	if err != nil {
+		return nil, err
+	}
+	meta.FolderName = folderName
+	return meta, nil
 }
 
 // relURL computes the URL-style relative path from root to path.

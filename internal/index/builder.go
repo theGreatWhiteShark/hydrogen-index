@@ -126,6 +126,7 @@ func drumkitEntry(a scanner.ArtifactFile, m *model.DrumkitMetadata) model.Drumki
 	}
 	return model.DrumkitEntry{
 		SharedFields:    sharedFields(a, model.ArtifactTypeDrumkit, m.Name, m.Author, m.Info, m.License, m.UserVersion, m.FormatVersion, m.Tags),
+		FolderName:      m.FolderName,
 		Instruments:     m.Instruments,
 		Components:      m.Components,
 		Samples:         m.Samples,

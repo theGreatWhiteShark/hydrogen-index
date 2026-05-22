@@ -63,6 +63,7 @@ type SongEntry struct {
 // DrumkitEntry represents a single drumkit artifact in the index.
 type DrumkitEntry struct {
 	SharedFields
+	FolderName      string   `json:"folderName"`
 	Instruments     int      `json:"instruments"`
 	Components      int      `json:"components"`
 	Samples         int      `json:"samples"`
@@ -83,6 +84,7 @@ type DrumkitMetadata struct {
 	Components      int
 	Samples         int
 	InstrumentTypes []string
+	FolderName      string
 }
 
 // PatternMetadata holds metadata extracted from a pattern XML file.

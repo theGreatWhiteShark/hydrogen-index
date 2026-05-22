@@ -321,6 +321,7 @@ func (raw *rawDrumkit) toMetadata() *model.DrumkitMetadata {
 		FormatVersion: raw.formatVersion,
 		UserVersion:   raw.userVersion,
 		Tags:          nilToEmpty(raw.tags),
+		FolderName:    "",
 	}
 
 	meta.Instruments = len(raw.instruments)

@@ -1,6 +1,10 @@
 package scanner_test
 
 import (
+	"archive/tar"
+	"bytes"
+	"io"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -161,3 +165,115 @@ func TestScanSongMetadata(t *testing.T) {
 	}
 	t.Error("v2.0.0.h2song not found in scan results")
 }
+
+// TestScanDrumkitTarFolderName verifies that the folderName field is extracted
+// from the top-level folder inside a .h2drumkit tar archive.
+func TestScanDrumkitTarFolderName(t *testing.T) {
+	dir := artifactsDir(t)
+	artifacts, _ := scanner.Scan(dir)
+
+	for _, a := range artifacts {
+		if a.RelPath == "v2.0.0.h2drumkit" {
+			meta, ok := a.Metadata.(*model.DrumkitMetadata)
+			if !ok {
+				t.Fatalf("v2.0.0.h2drumkit: got %T, want *model.DrumkitMetadata", a.Metadata)
+			}
+			if meta.FolderName != "testKit" {
+				t.Errorf("v2.0.0.h2drumkit FolderName = %q, want %q", meta.FolderName, "testKit")
+			}
+			return
+		}
+	}
+	t.Error("v2.0.0.h2drumkit not found in scan results")
+}
+
+// TestScanDrumkitTarNoTopLevelFolder verifies that an archive with root-level
+// files (no containing folder) produces an error.
+func TestScanDrumkitTarNoTopLevelFolder(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "bad.h2drumkit")
+
+	var buf bytes.Buffer
+	w := tar.NewWriter(&buf)
+	// Write drumkit.xml directly at root (no folder).
+	hdr := &tar.Header{
+		Name: "drumkit.xml",
+		Mode: 0o644,
+		Size: int64(len(drumkitXML)),
+	}
+	if err := w.WriteHeader(hdr); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	if _, err := w.Write([]byte(drumkitXML)); err != nil {
+		t.Fatalf("write data: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close tar: %v", err)
+	}
+
+	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	_, errs := scanner.Scan(tmpDir)
+	if len(errs) == 0 {
+		t.Fatal("expected error for archive with no top-level folder, got none")
+	}
+}
+
+// TestScanDrumkitTarMultipleTopLevelFolders verifies that an archive with
+// multiple top-level folders produces an error.
+func TestScanDrumkitTarMultipleTopLevelFolders(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "bad.h2drumkit")
+
+	var buf bytes.Buffer
+	w := tar.NewWriter(&buf)
+	// Write a directory entry for folder1.
+	if err := w.WriteHeader(&tar.Header{Name: "folder1/", Typeflag: tar.TypeDir, Mode: 0o755}); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	// Write drumkit.xml inside folder1.
+	hdr := &tar.Header{
+		Name: "folder1/drumkit.xml",
+		Mode: 0o644,
+		Size: int64(len(drumkitXML)),
+	}
+	if err := w.WriteHeader(hdr); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	if _, err := w.Write([]byte(drumkitXML)); err != nil {
+		t.Fatalf("write data: %v", err)
+	}
+	// Write a directory entry for folder2.
+	if err := w.WriteHeader(&tar.Header{Name: "folder2/", Typeflag: tar.TypeDir, Mode: 0o755}); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	// Write a dummy file inside folder2.
+	if err := w.WriteHeader(&tar.Header{Name: "folder2/readme.txt", Mode: 0o644, Size: 4}); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	if _, err := io.WriteString(w, "test"); err != nil {
+		t.Fatalf("write data: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close tar: %v", err)
+	}
+
+	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	_, errs := scanner.Scan(tmpDir)
+	if len(errs) == 0 {
+		t.Fatal("expected error for archive with multiple top-level folders, got none")
+	}
+}
+
+// drumkitXML is a minimal valid drumkit.xml for test fixtures.
+const drumkitXML = `<?xml version="1.0"?>
+<drumkit_info>
+  <name>Test</name>
+  <formatVersion>2</formatVersion>
+  <instrumentList/>
+</drumkit_info>`

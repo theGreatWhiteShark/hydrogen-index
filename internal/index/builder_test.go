@@ -59,6 +59,7 @@ func sampleArtifacts() []scanner.ArtifactFile {
 				FormatVersion:   2,
 				UserVersion:     1,
 				Tags:            []string{"acoustic"},
+				FolderName:      "basic_kit",
 				Instruments:     9,
 				Components:      3,
 				Samples:         27,
@@ -160,6 +161,9 @@ func TestBuild_DrumkitFields(t *testing.T) {
 	d := idx.Drumkits[0]
 	if d.Name != "Basic Kit" {
 		t.Errorf("Name = %q, want %q", d.Name, "Basic Kit")
+	}
+	if d.FolderName != "basic_kit" {
+		t.Errorf("FolderName = %q, want %q", d.FolderName, "basic_kit")
 	}
 	if d.Instruments != 9 {
 		t.Errorf("Instruments = %d, want 9", d.Instruments)

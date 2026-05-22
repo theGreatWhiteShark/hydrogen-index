@@ -72,9 +72,10 @@
         { "$ref": "#/$defs/sharedFields" },
         {
           "type": "object",
-          "required": ["instruments", "components", "samples", "instrumentTypes"],
+          "required": ["folderName", "instruments", "components", "samples", "instrumentTypes"],
           "properties": {
             "type": { "const": "drumkit" },
+            "folderName": { "type": "string", "minimum": 0 },
             "instruments": { "type": "integer", "minimum": 0 },
             "components": { "type": "integer", "minimum": 0 },
             "samples": { "type": "integer", "minimum": 0 },
