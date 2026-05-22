@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/hydrogen-music/hydrogen-index/internal/index"
@@ -33,7 +34,7 @@ func TestIntegration_ScanAndValidate(t *testing.T) {
 	artifactsDir := filepath.Join(repoRoot(t), "res", "hydrogen-artifacts")
 
 	// ── Scan ─────────────────────────────────────────────────────────────────
-	artifacts, errs := scanner.Scan(artifactsDir)
+	artifacts, errs := scanner.Scan(artifactsDir, "")
 	if len(errs) != 0 {
 		for _, e := range errs {
 			t.Errorf("scan error: %v", e)
@@ -279,5 +280,190 @@ func TestIntegration_DefaultScan(t *testing.T) {
 	// The generated file must also pass schema validation.
 	if err := validator.Validate(outputPath); err != nil {
 		t.Errorf("generated index.json failed validation: %v", err)
+	}
+}
+
+// TestIntegration_ProviderGitHub verifies that --provider github constructs
+// correct GitHub raw-file URLs.
+func TestIntegration_ProviderGitHub(t *testing.T) {
+	root := repoRoot(t)
+
+	tmpDir, err := os.MkdirTemp("", "hydrogen-index-bin-*")
+	if err != nil {
+		t.Fatalf("create temp dir: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+
+	binPath := filepath.Join(tmpDir, "hydrogen-index")
+	build := exec.Command("go", "build", "-o", binPath, ".")
+	build.Dir = root
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("go build failed: %v\n%s", err, out)
+	}
+
+	outputPath := filepath.Join(tmpDir, "index.json")
+	artifactsDir := filepath.Join(root, "res", "hydrogen-artifacts")
+	run := exec.Command(binPath, "-d", artifactsDir, "-o", outputPath,
+		"--provider", "github", "--repo", "user/repo", "--branch", "main")
+	if out, err := run.CombinedOutput(); err != nil {
+		t.Fatalf("binary execution failed: %v\n%s", err, out)
+	}
+
+	data, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("read output: %v", err)
+	}
+
+	var result model.Index
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// All URLs should start with the GitHub raw base URL.
+	prefix := "https://raw.githubusercontent.com/user/repo/main/"
+	for i, p := range result.Patterns {
+		if !strings.HasPrefix(p.URL, prefix) {
+			t.Errorf("Patterns[%d].URL = %q, want prefix %q", i, p.URL, prefix)
+		}
+	}
+	for i, s := range result.Songs {
+		if !strings.HasPrefix(s.URL, prefix) {
+			t.Errorf("Songs[%d].URL = %q, want prefix %q", i, s.URL, prefix)
+		}
+	}
+	for i, d := range result.Drumkits {
+		if !strings.HasPrefix(d.URL, prefix) {
+			t.Errorf("Drumkits[%d].URL = %q, want prefix %q", i, d.URL, prefix)
+		}
+	}
+}
+
+// TestIntegration_ProviderGitLab verifies that --provider gitlab constructs
+// correct GitLab raw-file URLs.
+func TestIntegration_ProviderGitLab(t *testing.T) {
+	root := repoRoot(t)
+
+	tmpDir, err := os.MkdirTemp("", "hydrogen-index-bin-*")
+	if err != nil {
+		t.Fatalf("create temp dir: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+
+	binPath := filepath.Join(tmpDir, "hydrogen-index")
+	build := exec.Command("go", "build", "-o", binPath, ".")
+	build.Dir = root
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("go build failed: %v\n%s", err, out)
+	}
+
+	outputPath := filepath.Join(tmpDir, "index.json")
+	artifactsDir := filepath.Join(root, "res", "hydrogen-artifacts")
+	run := exec.Command(binPath, "-d", artifactsDir, "-o", outputPath,
+		"--provider", "gitlab", "--repo", "user/repo", "--branch", "develop")
+	if out, err := run.CombinedOutput(); err != nil {
+		t.Fatalf("binary execution failed: %v\n%s", err, out)
+	}
+
+	data, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("read output: %v", err)
+	}
+
+	var result model.Index
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// All URLs should start with the GitLab raw base URL.
+	prefix := "https://gitlab.com/user/repo/-/raw/develop/"
+	for i, p := range result.Patterns {
+		if !strings.HasPrefix(p.URL, prefix) {
+			t.Errorf("Patterns[%d].URL = %q, want prefix %q", i, p.URL, prefix)
+		}
+	}
+}
+
+// TestIntegration_BaseURL verifies that --base-url prepends arbitrary URLs.
+func TestIntegration_BaseURL(t *testing.T) {
+	root := repoRoot(t)
+
+	tmpDir, err := os.MkdirTemp("", "hydrogen-index-bin-*")
+	if err != nil {
+		t.Fatalf("create temp dir: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+
+	binPath := filepath.Join(tmpDir, "hydrogen-index")
+	build := exec.Command("go", "build", "-o", binPath, ".")
+	build.Dir = root
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("go build failed: %v\n%s", err, out)
+	}
+
+	outputPath := filepath.Join(tmpDir, "index.json")
+	artifactsDir := filepath.Join(root, "res", "hydrogen-artifacts")
+	run := exec.Command(binPath, "-d", artifactsDir, "-o", outputPath,
+		"--base-url", "https://example.com/artifacts")
+	if out, err := run.CombinedOutput(); err != nil {
+		t.Fatalf("binary execution failed: %v\n%s", err, out)
+	}
+
+	data, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("read output: %v", err)
+	}
+
+	var result model.Index
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	prefix := "https://example.com/artifacts/"
+	for i, p := range result.Patterns {
+		if !strings.HasPrefix(p.URL, prefix) {
+			t.Errorf("Patterns[%d].URL = %q, want prefix %q", i, p.URL, prefix)
+		}
+	}
+}
+
+// TestIntegration_NoBaseURL verifies that without URL flags, URLs are relative paths.
+func TestIntegration_NoBaseURL(t *testing.T) {
+	root := repoRoot(t)
+
+	tmpDir, err := os.MkdirTemp("", "hydrogen-index-bin-*")
+	if err != nil {
+		t.Fatalf("create temp dir: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+
+	binPath := filepath.Join(tmpDir, "hydrogen-index")
+	build := exec.Command("go", "build", "-o", binPath, ".")
+	build.Dir = root
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("go build failed: %v\n%s", err, out)
+	}
+
+	outputPath := filepath.Join(tmpDir, "index.json")
+	artifactsDir := filepath.Join(root, "res", "hydrogen-artifacts")
+	run := exec.Command(binPath, "-d", artifactsDir, "-o", outputPath)
+	if out, err := run.CombinedOutput(); err != nil {
+		t.Fatalf("binary execution failed: %v\n%s", err, out)
+	}
+
+	data, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("read output: %v", err)
+	}
+
+	var result model.Index
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// URLs should be plain relative paths (no "http" prefix).
+	for i, p := range result.Patterns {
+		if strings.HasPrefix(p.URL, "http") {
+			t.Errorf("Patterns[%d].URL = %q, want relative path (no http prefix)", i, p.URL)
+		}
 	}
 }

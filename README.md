@@ -32,6 +32,18 @@ hydrogen-index scan -d /path/to/artifacts
 
 # Specify output file
 hydrogen-index scan -d /path/to/artifacts -o custom-index.json
+
+# Construct GitHub permalinks
+hydrogen-index scan -d /path/to/artifacts \
+  --provider github --repo user/repo --branch main
+
+# Construct GitLab permalinks
+hydrogen-index scan -d /path/to/artifacts \
+  --provider gitlab --repo user/repo --branch main
+
+# Use arbitrary base URL
+hydrogen-index scan -d /path/to/artifacts \
+  --base-url https://example.com/artifacts
 ```
 
 ### Validate

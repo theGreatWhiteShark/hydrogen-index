@@ -324,3 +324,49 @@ func TestBuild_IndexVersion(t *testing.T) {
 		t.Error("Created must not be empty")
 	}
 }
+
+// TestBuild_URLWithBaseURL verifies that BaseURL is prepended to RelPath.
+func TestBuild_URLWithBaseURL(t *testing.T) {
+	artifacts := []scanner.ArtifactFile{
+		{
+			RelPath: "patterns/boom.h2pattern",
+			BaseURL: "https://raw.githubusercontent.com/user/repo/main",
+			Hash:    "abc",
+			Metadata: &model.PatternMetadata{
+				Name:  "Boom",
+				Tags:  []string{},
+			},
+		},
+	}
+	idx, err := Build(artifacts)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	want := "https://raw.githubusercontent.com/user/repo/main/patterns/boom.h2pattern"
+	if idx.Patterns[0].URL != want {
+		t.Errorf("URL = %q, want %q", idx.Patterns[0].URL, want)
+	}
+}
+
+// TestBuild_URLWithoutBaseURL verifies that empty BaseURL yields RelPath only.
+func TestBuild_URLWithoutBaseURL(t *testing.T) {
+	artifacts := []scanner.ArtifactFile{
+		{
+			RelPath: "drumkits/kit.h2drumkit",
+			BaseURL: "",
+			Hash:    "def",
+			Metadata: &model.DrumkitMetadata{
+				Name:  "Kit",
+				Tags:  []string{},
+			},
+		},
+	}
+	idx, err := Build(artifacts)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	want := "drumkits/kit.h2drumkit"
+	if idx.Drumkits[0].URL != want {
+		t.Errorf("URL = %q, want %q", idx.Drumkits[0].URL, want)
+	}
+}

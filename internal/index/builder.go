@@ -85,10 +85,14 @@ func sharedFields(a scanner.ArtifactFile, artifactType model.ArtifactType,
 	if tags == nil {
 		tags = []string{}
 	}
+	url := a.RelPath
+	if a.BaseURL != "" {
+		url = a.BaseURL + "/" + a.RelPath
+	}
 	return model.SharedFields{
 		Type:          artifactType,
 		Name:          name,
-		URL:           a.RelPath,
+		URL:           url,
 		Hash:          a.Hash,
 		Author:        author,
 		Description:   info,

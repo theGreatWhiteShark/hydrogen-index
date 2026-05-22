@@ -27,7 +27,7 @@ func artifactsDir(t *testing.T) string {
 
 func TestScan(t *testing.T) {
 	dir := artifactsDir(t)
-	artifacts, errs := scanner.Scan(dir)
+	artifacts, errs := scanner.Scan(dir, "")
 
 	// Parse errors are non-fatal but unexpected for well-formed fixtures.
 	if len(errs) != 0 {
@@ -85,7 +85,7 @@ func TestScan(t *testing.T) {
 // into *model.PatternMetadata with the expected type assertion.
 func TestScanPatternMetadataTypes(t *testing.T) {
 	dir := artifactsDir(t)
-	artifacts, _ := scanner.Scan(dir)
+	artifacts, _ := scanner.Scan(dir, "")
 
 	for _, a := range artifacts {
 		if a.RelPath == "v2.0.0.h2pattern" {
@@ -102,7 +102,7 @@ func TestScanPatternMetadataTypes(t *testing.T) {
 // correctly and its size/hash reflect the archive file, not the embedded XML.
 func TestScanDrumkitTarMetadata(t *testing.T) {
 	dir := artifactsDir(t)
-	artifacts, _ := scanner.Scan(dir)
+	artifacts, _ := scanner.Scan(dir, "")
 
 	for _, a := range artifacts {
 		if a.RelPath == "v2.0.0.h2drumkit" {
@@ -124,7 +124,7 @@ func TestScanDrumkitTarMetadata(t *testing.T) {
 // TestScanSongMetadata verifies that song files are parsed into *model.SongMetadata.
 func TestScanSongMetadata(t *testing.T) {
 	dir := artifactsDir(t)
-	artifacts, _ := scanner.Scan(dir)
+	artifacts, _ := scanner.Scan(dir, "")
 
 	for _, a := range artifacts {
 		if a.RelPath == "v2.0.0.h2song" {
@@ -141,7 +141,7 @@ func TestScanSongMetadata(t *testing.T) {
 // from the top-level folder inside a .h2drumkit tar archive.
 func TestScanDrumkitTarFolderName(t *testing.T) {
 	dir := artifactsDir(t)
-	artifacts, _ := scanner.Scan(dir)
+	artifacts, _ := scanner.Scan(dir, "")
 
 	for _, a := range artifacts {
 		if a.RelPath == "v2.0.0.h2drumkit" {
@@ -186,7 +186,7 @@ func TestScanDrumkitTarNoTopLevelFolder(t *testing.T) {
 		t.Fatalf("write file: %v", err)
 	}
 
-	_, errs := scanner.Scan(tmpDir)
+	_, errs := scanner.Scan(tmpDir, "")
 	if len(errs) == 0 {
 		t.Fatal("expected error for archive with no top-level folder, got none")
 	}
@@ -235,9 +235,43 @@ func TestScanDrumkitTarMultipleTopLevelFolders(t *testing.T) {
 		t.Fatalf("write file: %v", err)
 	}
 
-	_, errs := scanner.Scan(tmpDir)
+	_, errs := scanner.Scan(tmpDir, "")
 	if len(errs) == 0 {
 		t.Fatal("expected error for archive with multiple top-level folders, got none")
+	}
+}
+
+// TestScanBaseURL verifies that the BaseURL is set on all artifacts when
+// provided to Scan.
+func TestScanBaseURL(t *testing.T) {
+	dir := artifactsDir(t)
+	baseURL := "https://example.com/artifacts/main"
+	artifacts, errs := scanner.Scan(dir, baseURL)
+	if len(errs) != 0 {
+		for _, e := range errs {
+			t.Errorf("scan error: %v", e)
+		}
+	}
+	for _, a := range artifacts {
+		if a.BaseURL != baseURL {
+			t.Errorf("%s: BaseURL = %q, want %q", a.RelPath, a.BaseURL, baseURL)
+		}
+	}
+}
+
+// TestScanEmptyBaseURL verifies that empty BaseURL is left as-is.
+func TestScanEmptyBaseURL(t *testing.T) {
+	dir := artifactsDir(t)
+	artifacts, errs := scanner.Scan(dir, "")
+	if len(errs) != 0 {
+		for _, e := range errs {
+			t.Errorf("scan error: %v", e)
+		}
+	}
+	for _, a := range artifacts {
+		if a.BaseURL != "" {
+			t.Errorf("%s: BaseURL = %q, want empty", a.RelPath, a.BaseURL)
+		}
 	}
 }
 

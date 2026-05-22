@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 - `folderName` field for drumkit entries in index.json (extracted from
   `.h2drumkit` tar archive structure).
+- `--base-url`, `--provider`, `--repo`, and `--branch` flags for constructing
+  permalink URLs in `index.json`.
+- Provider presets for GitHub and GitLab raw-file URL generation.
 
 ### Removed
 

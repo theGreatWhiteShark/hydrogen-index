@@ -20,7 +20,8 @@ import (
 // ArtifactFile represents a discovered artifact with its parsed metadata and file info.
 type ArtifactFile struct {
 	Path     string      // absolute path to the file
-	RelPath  string      // relative path from scan root (used as URL in index)
+	RelPath  string      // relative path from scan root
+	BaseURL  string      // base URL prepended to RelPath for full permalink
 	Hash     string      // hex-encoded SHA-256
 	Size     int64
 	Metadata interface{} // one of *model.DrumkitMetadata, *model.PatternMetadata, *model.SongMetadata
@@ -28,7 +29,9 @@ type ArtifactFile struct {
 
 // Scan walks the directory tree rooted at dir and returns all discovered Hydrogen artifacts.
 // Non-fatal parse errors are collected rather than stopping the scan.
-func Scan(dir string) ([]ArtifactFile, []error) {
+// The baseURL parameter is prepended to each artifact's relative path when
+// constructing the full URL in the index.
+func Scan(dir, baseURL string) ([]ArtifactFile, []error) {
 	var results []ArtifactFile
 	var errs []error
 
@@ -48,6 +51,7 @@ func Scan(dir string) ([]ArtifactFile, []error) {
 			return nil
 		}
 		if artifact != nil {
+			artifact.BaseURL = baseURL
 			results = append(results, *artifact)
 		}
 		return nil

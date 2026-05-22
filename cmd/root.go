@@ -45,11 +45,19 @@ func buildRootCmd() *cobra.Command {
 type scanFlags struct {
 	directory string
 	output    string
+	baseURL   string
+	provider  string
+	repo      string
+	branch    string
 }
 
 func addScanFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("directory", "d", "", "directory to scan (default: git repo root)")
 	cmd.Flags().StringP("output", "o", "", "output file path (default: index.json in scan directory)")
+	cmd.Flags().StringP("base-url", "b", "", "base URL prepended to artifact URLs")
+	cmd.Flags().StringP("provider", "p", "", "git provider: github, gitlab (constructs base URL)")
+	cmd.Flags().StringP("repo", "r", "", "repository as owner/repo (used with --provider)")
+	cmd.Flags().StringP("branch", "", "main", "branch name (used with --provider)")
 }
 
 func buildScanCmd() *cobra.Command {
@@ -69,9 +77,14 @@ func runScan(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	baseURL, err := flags.resolveBaseURL()
+	if err != nil {
+		return err
+	}
+
 	fmt.Fprintf(os.Stderr, "Scanning %s...\n", flags.directory)
 
-	artifacts, scanErrs := scanner.Scan(flags.directory)
+	artifacts, scanErrs := scanner.Scan(flags.directory, baseURL)
 	for _, e := range scanErrs {
 		fmt.Fprintf(os.Stderr, "warning: %v\n", e)
 	}
@@ -100,6 +113,10 @@ func runScan(cmd *cobra.Command, args []string) error {
 func resolveScanFlags(cmd *cobra.Command) (scanFlags, error) {
 	dir, _ := cmd.Flags().GetString("directory")
 	out, _ := cmd.Flags().GetString("output")
+	baseURL, _ := cmd.Flags().GetString("base-url")
+	provider, _ := cmd.Flags().GetString("provider")
+	repo, _ := cmd.Flags().GetString("repo")
+	branch, _ := cmd.Flags().GetString("branch")
 
 	if dir == "" {
 		root, err := findGitRoot()
@@ -113,7 +130,29 @@ func resolveScanFlags(cmd *cobra.Command) (scanFlags, error) {
 		out = filepath.Join(dir, "index.json")
 	}
 
-	return scanFlags{directory: dir, output: out}, nil
+	return scanFlags{directory: dir, output: out, baseURL: baseURL, provider: provider, repo: repo, branch: branch}, nil
+}
+
+// resolveBaseURL computes the base URL from flags.
+// --base-url takes precedence over --provider/--repo/--branch.
+func (f scanFlags) resolveBaseURL() (string, error) {
+	if f.baseURL != "" {
+		return f.baseURL, nil
+	}
+	if f.provider == "" {
+		return "", nil // relative path only
+	}
+	if f.repo == "" {
+		return "", fmt.Errorf("--repo is required with --provider %s", f.provider)
+	}
+	switch f.provider {
+	case "github":
+		return fmt.Sprintf("https://raw.githubusercontent.com/%s/%s", f.repo, f.branch), nil
+	case "gitlab":
+		return fmt.Sprintf("https://gitlab.com/%s/-/raw/%s", f.repo, f.branch), nil
+	default:
+		return "", fmt.Errorf("unknown provider %q; supported: github, gitlab", f.provider)
+	}
 }
 
 // findGitRoot walks upward from the current working directory until it finds a
