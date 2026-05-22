@@ -86,8 +86,8 @@ func TestIntegration_ScanAndValidate(t *testing.T) {
 	if result.SongCount != 16 {
 		t.Errorf("SongCount = %d, want 16", result.SongCount)
 	}
-	if result.DrumkitCount != 4 {
-		t.Errorf("DrumkitCount = %d, want 4", result.DrumkitCount)
+	if result.DrumkitCount != 2 {
+		t.Errorf("DrumkitCount = %d, want 2", result.DrumkitCount)
 	}
 
 	// Slice lengths must agree with the declared counts.

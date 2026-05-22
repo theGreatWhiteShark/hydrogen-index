@@ -63,7 +63,6 @@ func Scan(dir string) ([]ArtifactFile, []error) {
 // a recognised Hydrogen artifact, nil if it should be skipped, or an error if
 // it looks like an artifact but could not be parsed.
 func processFile(path, root string) (*ArtifactFile, error) {
-	base := filepath.Base(path)
 	ext := filepath.Ext(path)
 
 	switch {
@@ -79,11 +78,6 @@ func processFile(path, root string) (*ArtifactFile, error) {
 
 	case ext == ".h2drumkit":
 		return parseDrumkitTar(path, root)
-
-	case base == "drumkit.xml":
-		return parseRegular(path, root, func(r io.Reader) (interface{}, error) {
-			return parser.ParseDrumkit(r)
-		})
 	}
 
 	return nil, nil

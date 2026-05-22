@@ -51,7 +51,6 @@ hydrogen-index --version
 - `.h2drumkit` — Hydrogen drumkit archives (tar format containing drumkit.xml)
 - `.h2pattern` — Hydrogen pattern files
 - `.h2song` — Hydrogen song files
-- `drumkit.xml` — Standalone drumkit XML files
 
 Supports format versions from 0.9.3 through 2.0.0.
 

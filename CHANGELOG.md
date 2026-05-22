@@ -8,9 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
-- `folderName` field for drumkit entries in index.json (extracted from `.h2drumkit` tar archive structure)
-- `.h2drumkit` files are now only accepted in case they contain exactly one
-  top-level folder.
+- `folderName` field for drumkit entries in index.json (extracted from
+  `.h2drumkit` tar archive structure).
+
+### Removed
+
+- Support for standalone `drumkit.xml` files. Only `.h2drumkit` archives are now
+  recognized.
 
 ## [0.1.0] - 2026-03-27
 

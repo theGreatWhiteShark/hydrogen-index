@@ -53,7 +53,7 @@ func TestScan(t *testing.T) {
 	if got, want := len(patterns), 3; got != want {
 		t.Errorf("pattern count: got %d, want %d", got, want)
 	}
-	if got, want := len(drumkits), 4; got != want {
+	if got, want := len(drumkits), 2; got != want {
 		t.Errorf("drumkit count: got %d, want %d", got, want)
 	}
 	if got, want := len(songs), 16; got != want {
@@ -119,35 +119,6 @@ func TestScanDrumkitTarMetadata(t *testing.T) {
 		}
 	}
 	t.Error("v2.0.0.h2drumkit not found in scan results")
-}
-
-// TestScanStandaloneDrumkitXML verifies that standalone drumkit.xml files (not
-// inside a tar archive) are discovered and parsed correctly.
-func TestScanStandaloneDrumkitXML(t *testing.T) {
-	dir := artifactsDir(t)
-	artifacts, _ := scanner.Scan(dir)
-
-	wantRelPaths := []string{
-		"legacy-drumkits/kit-1.2.3/drumkit.xml",
-		"legacy-drumkits/kit-0.9.3/drumkit.xml",
-	}
-
-	found := make(map[string]bool)
-	for _, a := range artifacts {
-		for _, want := range wantRelPaths {
-			if a.RelPath == want {
-				if _, ok := a.Metadata.(*model.DrumkitMetadata); !ok {
-					t.Errorf("%s: got %T, want *model.DrumkitMetadata", a.RelPath, a.Metadata)
-				}
-				found[want] = true
-			}
-		}
-	}
-	for _, want := range wantRelPaths {
-		if !found[want] {
-			t.Errorf("standalone drumkit not found: %s", want)
-		}
-	}
 }
 
 // TestScanSongMetadata verifies that song files are parsed into *model.SongMetadata.
