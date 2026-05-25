@@ -34,7 +34,7 @@ func TestIntegration_ScanAndValidate(t *testing.T) {
 	artifactsDir := filepath.Join(repoRoot(t), "res", "hydrogen-artifacts")
 
 	// ── Scan ─────────────────────────────────────────────────────────────────
-	artifacts, errs := scanner.Scan(artifactsDir, "")
+	artifacts, errs := scanner.Scan(artifactsDir, "", nil)
 	if len(errs) != 0 {
 		for _, e := range errs {
 			t.Errorf("scan error: %v", e)

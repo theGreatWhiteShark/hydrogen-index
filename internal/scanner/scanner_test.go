@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/hydrogen-music/hydrogen-index/internal/model"
@@ -27,7 +28,7 @@ func artifactsDir(t *testing.T) string {
 
 func TestScan(t *testing.T) {
 	dir := artifactsDir(t)
-	artifacts, errs := scanner.Scan(dir, "")
+	artifacts, errs := scanner.Scan(dir, "", nil)
 
 	// Parse errors are non-fatal but unexpected for well-formed fixtures.
 	if len(errs) != 0 {
@@ -85,7 +86,7 @@ func TestScan(t *testing.T) {
 // into *model.PatternMetadata with the expected type assertion.
 func TestScanPatternMetadataTypes(t *testing.T) {
 	dir := artifactsDir(t)
-	artifacts, _ := scanner.Scan(dir, "")
+	artifacts, _ := scanner.Scan(dir, "", nil)
 
 	for _, a := range artifacts {
 		if a.RelPath == "v2.0.0.h2pattern" {
@@ -102,7 +103,7 @@ func TestScanPatternMetadataTypes(t *testing.T) {
 // correctly and its size/hash reflect the archive file, not the embedded XML.
 func TestScanDrumkitTarMetadata(t *testing.T) {
 	dir := artifactsDir(t)
-	artifacts, _ := scanner.Scan(dir, "")
+	artifacts, _ := scanner.Scan(dir, "", nil)
 
 	for _, a := range artifacts {
 		if a.RelPath == "v2.0.0.h2drumkit" {
@@ -124,7 +125,7 @@ func TestScanDrumkitTarMetadata(t *testing.T) {
 // TestScanSongMetadata verifies that song files are parsed into *model.SongMetadata.
 func TestScanSongMetadata(t *testing.T) {
 	dir := artifactsDir(t)
-	artifacts, _ := scanner.Scan(dir, "")
+	artifacts, _ := scanner.Scan(dir, "", nil)
 
 	for _, a := range artifacts {
 		if a.RelPath == "v2.0.0.h2song" {
@@ -141,7 +142,7 @@ func TestScanSongMetadata(t *testing.T) {
 // from the top-level folder inside a .h2drumkit tar archive.
 func TestScanDrumkitTarFolderName(t *testing.T) {
 	dir := artifactsDir(t)
-	artifacts, _ := scanner.Scan(dir, "")
+	artifacts, _ := scanner.Scan(dir, "", nil)
 
 	for _, a := range artifacts {
 		if a.RelPath == "v2.0.0.h2drumkit" {
@@ -186,7 +187,7 @@ func TestScanDrumkitTarNoTopLevelFolder(t *testing.T) {
 		t.Fatalf("write file: %v", err)
 	}
 
-	_, errs := scanner.Scan(tmpDir, "")
+	_, errs := scanner.Scan(tmpDir, "", nil)
 	if len(errs) == 0 {
 		t.Fatal("expected error for archive with no top-level folder, got none")
 	}
@@ -235,7 +236,7 @@ func TestScanDrumkitTarMultipleTopLevelFolders(t *testing.T) {
 		t.Fatalf("write file: %v", err)
 	}
 
-	_, errs := scanner.Scan(tmpDir, "")
+	_, errs := scanner.Scan(tmpDir, "", nil)
 	if len(errs) == 0 {
 		t.Fatal("expected error for archive with multiple top-level folders, got none")
 	}
@@ -246,7 +247,7 @@ func TestScanDrumkitTarMultipleTopLevelFolders(t *testing.T) {
 func TestScanBaseURL(t *testing.T) {
 	dir := artifactsDir(t)
 	baseURL := "https://example.com/artifacts/main"
-	artifacts, errs := scanner.Scan(dir, baseURL)
+	artifacts, errs := scanner.Scan(dir, baseURL, nil)
 	if len(errs) != 0 {
 		for _, e := range errs {
 			t.Errorf("scan error: %v", e)
@@ -262,7 +263,7 @@ func TestScanBaseURL(t *testing.T) {
 // TestScanEmptyBaseURL verifies that empty BaseURL is left as-is.
 func TestScanEmptyBaseURL(t *testing.T) {
 	dir := artifactsDir(t)
-	artifacts, errs := scanner.Scan(dir, "")
+	artifacts, errs := scanner.Scan(dir, "", nil)
 	if len(errs) != 0 {
 		for _, e := range errs {
 			t.Errorf("scan error: %v", e)
@@ -282,3 +283,199 @@ const drumkitXML = `<?xml version="1.0"?>
   <formatVersion>2</formatVersion>
   <instrumentList/>
 </drumkit_info>`
+
+// TestScanExcludeSingleDirectory verifies that a single directory can be excluded
+// from scanning by its name.
+func TestScanExcludeSingleDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a directory structure with artifacts
+	excludedDir := filepath.Join(tmpDir, "test")
+	if err := os.Mkdir(excludedDir, 0o755); err != nil {
+		t.Fatalf("create excluded dir: %v", err)
+	}
+
+	// Create an artifact in the excluded directory
+	excludedArtifact := filepath.Join(excludedDir, "excluded.h2pattern")
+	if err := os.WriteFile(excludedArtifact, []byte(patternXML), 0o644); err != nil {
+		t.Fatalf("write excluded artifact: %v", err)
+	}
+
+	// Create an artifact in the root directory (should be scanned)
+	includedArtifact := filepath.Join(tmpDir, "included.h2pattern")
+	if err := os.WriteFile(includedArtifact, []byte(patternXML), 0o644); err != nil {
+		t.Fatalf("write included artifact: %v", err)
+	}
+
+	// Scan with the directory excluded
+	artifacts, errs := scanner.Scan(tmpDir, "", []string{"test"})
+	if len(errs) != 0 {
+		for _, e := range errs {
+			t.Errorf("scan error: %v", e)
+		}
+	}
+
+	// Verify only the included artifact was found
+	if got, want := len(artifacts), 1; got != want {
+		t.Errorf("artifact count: got %d, want %d", got, want)
+	}
+
+	// Verify the excluded artifact was not found
+	for _, a := range artifacts {
+		if a.RelPath == "test/excluded.h2pattern" {
+			t.Errorf("excluded artifact was scanned: %s", a.RelPath)
+		}
+	}
+}
+
+// TestScanExcludeMultipleDirectories verifies that multiple directories can be
+// excluded from scanning.
+func TestScanExcludeMultipleDirectories(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create multiple directories to exclude
+	excludedDirs := []string{"test", "node_modules", ".git"}
+	for _, dirName := range excludedDirs {
+		dirPath := filepath.Join(tmpDir, dirName)
+		if err := os.Mkdir(dirPath, 0o755); err != nil {
+			t.Fatalf("create excluded dir %s: %v", dirName, err)
+		}
+
+		// Add an artifact to each excluded directory
+		artifactPath := filepath.Join(dirPath, dirName+".h2pattern")
+		if err := os.WriteFile(artifactPath, []byte(patternXML), 0o644); err != nil {
+			t.Fatalf("write artifact in %s: %v", dirName, err)
+		}
+	}
+
+	// Create an artifact in the root directory (should be scanned)
+	includedArtifact := filepath.Join(tmpDir, "included.h2pattern")
+	if err := os.WriteFile(includedArtifact, []byte(patternXML), 0o644); err != nil {
+		t.Fatalf("write included artifact: %v", err)
+	}
+
+	// Scan with all directories excluded
+	artifacts, errs := scanner.Scan(tmpDir, "", excludedDirs)
+	if len(errs) != 0 {
+		for _, e := range errs {
+			t.Errorf("scan error: %v", e)
+		}
+	}
+
+	// Verify only the included artifact was found
+	if got, want := len(artifacts), 1; got != want {
+		t.Errorf("artifact count: got %d, want %d", got, want)
+	}
+
+	// Verify no excluded artifacts were found
+	for _, a := range artifacts {
+		for _, dirName := range excludedDirs {
+			if strings.HasPrefix(a.RelPath, dirName+"/") {
+				t.Errorf("artifact in excluded directory was scanned: %s", a.RelPath)
+			}
+		}
+	}
+}
+
+// TestScanExcludeRelativePath verifies that directories can be excluded by
+// their relative path from the scan root.
+func TestScanExcludeRelativePath(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a nested directory structure
+	nestedDir := filepath.Join(tmpDir, "res", "test-artifacts")
+	if err := os.MkdirAll(nestedDir, 0o755); err != nil {
+		t.Fatalf("create nested dir: %v", err)
+	}
+
+	// Create an artifact in the nested directory
+	excludedArtifact := filepath.Join(nestedDir, "excluded.h2pattern")
+	if err := os.WriteFile(excludedArtifact, []byte(patternXML), 0o644); err != nil {
+		t.Fatalf("write excluded artifact: %v", err)
+	}
+
+	// Create an artifact in the root directory (should be scanned)
+	includedArtifact := filepath.Join(tmpDir, "included.h2pattern")
+	if err := os.WriteFile(includedArtifact, []byte(patternXML), 0o644); err != nil {
+		t.Fatalf("write included artifact: %v", err)
+	}
+
+	// Scan with the relative path excluded
+	artifacts, errs := scanner.Scan(tmpDir, "", []string{"res/test-artifacts"})
+	if len(errs) != 0 {
+		for _, e := range errs {
+			t.Errorf("scan error: %v", e)
+		}
+	}
+
+	// Verify only the included artifact was found
+	if got, want := len(artifacts), 1; got != want {
+		t.Errorf("artifact count: got %d, want %d", got, want)
+	}
+
+	// Verify the excluded artifact was not found
+	for _, a := range artifacts {
+		if a.RelPath == "res/test-artifacts/excluded.h2pattern" {
+			t.Errorf("excluded artifact was scanned: %s", a.RelPath)
+		}
+	}
+}
+
+// TestScanExcludeEmpty verifies that an empty exclude list does not affect scanning.
+func TestScanExcludeEmpty(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create an artifact
+	artifactPath := filepath.Join(tmpDir, "test.h2pattern")
+	if err := os.WriteFile(artifactPath, []byte(patternXML), 0o644); err != nil {
+		t.Fatalf("write artifact: %v", err)
+	}
+
+	// Scan with empty exclude list
+	artifacts, errs := scanner.Scan(tmpDir, "", []string{})
+	if len(errs) != 0 {
+		for _, e := range errs {
+			t.Errorf("scan error: %v", e)
+		}
+	}
+
+	// Verify the artifact was found
+	if got, want := len(artifacts), 1; got != want {
+		t.Errorf("artifact count: got %d, want %d", got, want)
+	}
+}
+
+// TestScanExcludeNonExistent verifies that excluding non-existent paths does not
+// cause errors.
+func TestScanExcludeNonExistent(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create an artifact
+	artifactPath := filepath.Join(tmpDir, "test.h2pattern")
+	if err := os.WriteFile(artifactPath, []byte(patternXML), 0o644); err != nil {
+		t.Fatalf("write artifact: %v", err)
+	}
+
+	// Scan with non-existent exclude paths
+	artifacts, errs := scanner.Scan(tmpDir, "", []string{"nonexistent", "also-nonexistent"})
+	if len(errs) != 0 {
+		for _, e := range errs {
+			t.Errorf("scan error: %v", e)
+		}
+	}
+
+	// Verify the artifact was still found
+	if got, want := len(artifacts), 1; got != want {
+		t.Errorf("artifact count: got %d, want %d", got, want)
+	}
+}
+
+// patternXML is a minimal valid pattern XML for test fixtures.
+const patternXML = `<?xml version="1.0"?>
+<drumkit_pattern>
+  <pattern_name>Test</pattern_name>
+  <version>2.0.0</version>
+  <author>Test Author</author>
+  <info>Test pattern</info>
+  <license>GPL</license>
+</drumkit_pattern>`

@@ -33,6 +33,13 @@ hydrogen-index scan -d /path/to/artifacts
 # Specify output file
 hydrogen-index scan -d /path/to/artifacts -o custom-index.json
 
+# Exclude folders from scanning (useful for CI/submodule setups)
+hydrogen-index scan -d /path/to/artifacts --exclude test
+hydrogen-index scan -d /path/to/artifacts -e test -e node_modules -e .git
+
+# Exclude by relative path
+hydrogen-index scan -d /path/to/artifacts -e res/test-artifacts
+
 # Construct GitHub permalinks
 hydrogen-index scan -d /path/to/artifacts \
   --provider github --repo user/repo --branch main

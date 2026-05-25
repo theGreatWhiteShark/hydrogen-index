@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- `--exclude` / `-e` flag to blacklist folders from scanning (useful for CI
+  and submodule setups to exclude test artifacts).
 - `folderName` field for drumkit entries in index.json (extracted from
   `.h2drumkit` tar archive structure).
 - `--base-url`, `--provider`, `--repo`, and `--branch` flags for constructing

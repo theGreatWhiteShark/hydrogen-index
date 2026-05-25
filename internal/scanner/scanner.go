@@ -19,10 +19,10 @@ import (
 
 // ArtifactFile represents a discovered artifact with its parsed metadata and file info.
 type ArtifactFile struct {
-	Path     string      // absolute path to the file
-	RelPath  string      // relative path from scan root
-	BaseURL  string      // base URL prepended to RelPath for full permalink
-	Hash     string      // hex-encoded SHA-256
+	Path     string // absolute path to the file
+	RelPath  string // relative path from scan root
+	BaseURL  string // base URL prepended to RelPath for full permalink
+	Hash     string // hex-encoded SHA-256
 	Size     int64
 	Metadata interface{} // one of *model.DrumkitMetadata, *model.PatternMetadata, *model.SongMetadata
 }
@@ -31,7 +31,8 @@ type ArtifactFile struct {
 // Non-fatal parse errors are collected rather than stopping the scan.
 // The baseURL parameter is prepended to each artifact's relative path when
 // constructing the full URL in the index.
-func Scan(dir, baseURL string) ([]ArtifactFile, []error) {
+// The exclude parameter contains folder paths to skip during scanning.
+func Scan(dir, baseURL string, exclude []string) ([]ArtifactFile, []error) {
 	var results []ArtifactFile
 	var errs []error
 
@@ -42,6 +43,9 @@ func Scan(dir, baseURL string) ([]ArtifactFile, []error) {
 			return nil
 		}
 		if d.IsDir() {
+			if isExcluded(path, dir, exclude) {
+				return fs.SkipDir
+			}
 			return nil
 		}
 
@@ -61,6 +65,32 @@ func Scan(dir, baseURL string) ([]ArtifactFile, []error) {
 	}
 
 	return results, errs
+}
+
+// isExcluded checks if a path should be excluded from scanning.
+// It matches against directory names at any level and relative paths from the scan root.
+func isExcluded(path, root string, exclude []string) bool {
+	if len(exclude) == 0 {
+		return false
+	}
+
+	relPath, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+
+	for _, excl := range exclude {
+		// Match exact directory name at any level
+		if filepath.Base(path) == excl {
+			return true
+		}
+		// Match relative path from root (e.g., "res/test-artifacts")
+		// Use filepath.ToSlash for consistent path comparison
+		if strings.HasPrefix(filepath.ToSlash(relPath), filepath.ToSlash(excl)) {
+			return true
+		}
+	}
+	return false
 }
 
 // processFile inspects a single file path and returns an ArtifactFile if it is

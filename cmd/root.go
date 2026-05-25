@@ -49,6 +49,7 @@ type scanFlags struct {
 	provider  string
 	repo      string
 	branch    string
+	exclude   []string
 }
 
 func addScanFlags(cmd *cobra.Command) {
@@ -58,6 +59,7 @@ func addScanFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("provider", "p", "", "git provider: github, gitlab (constructs base URL)")
 	cmd.Flags().StringP("repo", "r", "", "repository as owner/repo (used with --provider)")
 	cmd.Flags().StringP("branch", "", "main", "branch name (used with --provider)")
+	cmd.Flags().StringSliceP("exclude", "e", nil, "folders to exclude from scan (can be specified multiple times)")
 }
 
 func buildScanCmd() *cobra.Command {
@@ -84,7 +86,7 @@ func runScan(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintf(os.Stderr, "Scanning %s...\n", flags.directory)
 
-	artifacts, scanErrs := scanner.Scan(flags.directory, baseURL)
+	artifacts, scanErrs := scanner.Scan(flags.directory, baseURL, flags.exclude)
 	for _, e := range scanErrs {
 		fmt.Fprintf(os.Stderr, "warning: %v\n", e)
 	}
@@ -117,6 +119,7 @@ func resolveScanFlags(cmd *cobra.Command) (scanFlags, error) {
 	provider, _ := cmd.Flags().GetString("provider")
 	repo, _ := cmd.Flags().GetString("repo")
 	branch, _ := cmd.Flags().GetString("branch")
+	exclude, _ := cmd.Flags().GetStringSlice("exclude")
 
 	if dir == "" {
 		root, err := findGitRoot()
@@ -130,7 +133,7 @@ func resolveScanFlags(cmd *cobra.Command) (scanFlags, error) {
 		out = filepath.Join(dir, "index.json")
 	}
 
-	return scanFlags{directory: dir, output: out, baseURL: baseURL, provider: provider, repo: repo, branch: branch}, nil
+	return scanFlags{directory: dir, output: out, baseURL: baseURL, provider: provider, repo: repo, branch: branch, exclude: exclude}, nil
 }
 
 // resolveBaseURL computes the base URL from flags.
