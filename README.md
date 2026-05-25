@@ -21,6 +21,9 @@ go build -o hydrogen-index .
 
 ## Usage
 
+An example repo for an online library can be found in
+[hydrogen-online-library](https://github.com/theGreatWhiteShark/hydrogen-online-library).
+
 ### Scan (default command)
 
 ```
