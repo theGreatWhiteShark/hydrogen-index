@@ -58,8 +58,8 @@ func TestParseDrumkit(t *testing.T) {
 		checkInt(t, "UserVersion", got.UserVersion, 0)
 		checkStrings(t, "Tags", got.Tags, []string{"Example", "Drumkit"})
 		checkInt(t, "Instruments", got.Instruments, 3)
-		// One "Main" component referenced by all 3 instruments — 1 unique name.
-		checkInt(t, "Components", got.Components, 1)
+		// 3 instruments × 1 <instrumentComponent> each = 3 total.
+		checkInt(t, "Components", got.Components, 3)
 		checkInt(t, "Samples", got.Samples, 3)
 		// All three instruments have empty <type>; InstrumentTypes must be empty, not nil.
 		checkStrings(t, "InstrumentTypes", got.InstrumentTypes, []string{})

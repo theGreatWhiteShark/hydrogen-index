@@ -338,24 +338,11 @@ func (raw *rawDrumkit) toMetadata() *model.DrumkitMetadata {
 // countComponentsAndSamples applies the variant-specific counting rules.
 func (raw *rawDrumkit) countComponentsAndSamples() (components int, samples int) {
 	switch {
-	case len(raw.componentList) > 0:
-		// v1.2.3: components declared at top level; count from the list.
-		components = len(raw.componentList)
-		for _, instr := range raw.instruments {
-			for _, ic := range instr.instrComponents {
-				samples += ic.layers
-			}
-		}
-
 	case raw.hasInstrumentComponents():
-		// v2.0.0: components inferred from unique names across all instruments.
-		seen := make(map[string]struct{})
+		// v1.2.3 and v2.0.0: count <instrumentComponent> nodes across all instruments.
 		for _, instr := range raw.instruments {
 			for _, ic := range instr.instrComponents {
-				if _, exists := seen[ic.name]; !exists {
-					seen[ic.name] = struct{}{}
-					components++
-				}
+				components++
 				samples += ic.layers
 			}
 		}

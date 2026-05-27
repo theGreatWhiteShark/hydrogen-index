@@ -21,6 +21,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Calculation of top-level HASH was changed in order to the C++ counter part to
   properly parse it.
 
+### Fixed
+
+- Field "components" does now enumerate the instrument components instead of the
+  legacy drumkit components (aux channels to route instrument components).
+
 ### Removed
 
 - Support for standalone `drumkit.xml` files. Only `.h2drumkit` archives are now
