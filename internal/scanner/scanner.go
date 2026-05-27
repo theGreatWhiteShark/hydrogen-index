@@ -203,17 +203,20 @@ func findAndParseDrumkitXML(r io.Reader) (interface{}, error) {
 			return nil, fmt.Errorf("reading tar: %w", err)
 		}
 
+		// Normalize path: strip leading "./" if present.
+		entryName := strings.TrimPrefix(hdr.Name, "./")
+
 		// Determine the top-level folder for this entry.
-		slashIdx := strings.Index(hdr.Name, "/")
+		slashIdx := strings.Index(entryName, "/")
 		if slashIdx == -1 {
 			// Entry is at root level (no containing folder).
 			// Check if it's an ignored auxiliary file.
-			if isIgnoredTopLevelEntry(hdr.Name) {
+			if isIgnoredTopLevelEntry(entryName) {
 				continue
 			}
-			return nil, fmt.Errorf("archive contains top-level entry %q; expected all entries within a single top-level folder", hdr.Name)
+			return nil, fmt.Errorf("archive contains top-level entry %q; expected all entries within a single top-level folder", entryName)
 		}
-		topLevelFolder := hdr.Name[:slashIdx]
+		topLevelFolder := entryName[:slashIdx]
 
 		// Skip ignored top-level folders.
 		if isIgnoredTopLevelEntry(topLevelFolder) {
@@ -223,7 +226,7 @@ func findAndParseDrumkitXML(r io.Reader) (interface{}, error) {
 		topLevelFolders[topLevelFolder] = struct{}{}
 
 		// Buffer drumkit.xml content for later parsing.
-		if filepath.Base(hdr.Name) == "drumkit.xml" && hdr.Typeflag == tar.TypeReg {
+		if filepath.Base(entryName) == "drumkit.xml" && hdr.Typeflag == tar.TypeReg {
 			drumkitData, err = io.ReadAll(tr)
 			if err != nil {
 				return nil, fmt.Errorf("reading drumkit.xml: %w", err)

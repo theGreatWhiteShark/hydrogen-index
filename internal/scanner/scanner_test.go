@@ -472,6 +472,55 @@ func TestScanDrumkitTarWithNonIgnoredTopLevelFile(t *testing.T) {
 	}
 }
 
+// TestScanDrumkitTarWithLeadingDotSlash verifies that archives with paths
+// starting with "./" (common in some tar implementations) are parsed correctly.
+func TestScanDrumkitTarWithLeadingDotSlash(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "with-dot-slash.h2drumkit")
+
+	var buf bytes.Buffer
+	w := tar.NewWriter(&buf)
+
+	// Write entries with leading "./" prefix.
+	if err := w.WriteHeader(&tar.Header{Name: "./testKit/", Typeflag: tar.TypeDir, Mode: 0o755}); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	hdr := &tar.Header{
+		Name: "./testKit/drumkit.xml",
+		Mode: 0o644,
+		Size: int64(len(drumkitXML)),
+	}
+	if err := w.WriteHeader(hdr); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	if _, err := w.Write([]byte(drumkitXML)); err != nil {
+		t.Fatalf("write data: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close tar: %v", err)
+	}
+
+	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	artifacts, errs := scanner.Scan(tmpDir, "", nil)
+	if len(errs) != 0 {
+		t.Fatalf("scan errors: %v", errs)
+	}
+	if len(artifacts) != 1 {
+		t.Fatalf("artifact count: got %d, want 1", len(artifacts))
+	}
+
+	meta, ok := artifacts[0].Metadata.(*model.DrumkitMetadata)
+	if !ok {
+		t.Fatalf("metadata type: got %T, want *model.DrumkitMetadata", artifacts[0].Metadata)
+	}
+	if meta.FolderName != "testKit" {
+		t.Errorf("FolderName = %q, want %q", meta.FolderName, "testKit")
+	}
+}
+
 // TestScanBaseURL verifies that the BaseURL is set on all artifacts when
 // provided to Scan.
 func TestScanBaseURL(t *testing.T) {
