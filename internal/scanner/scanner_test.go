@@ -3,6 +3,7 @@ package scanner_test
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"io"
 	"os"
 	"path/filepath"
@@ -239,6 +240,66 @@ func TestScanDrumkitTarMultipleTopLevelFolders(t *testing.T) {
 	_, errs := scanner.Scan(tmpDir, "", nil)
 	if len(errs) == 0 {
 		t.Fatal("expected error for archive with multiple top-level folders, got none")
+	}
+}
+
+// TestScanDrumkitTarGzip verifies that gzip-compressed .h2drumkit files
+// are correctly parsed.
+func TestScanDrumkitTarGzip(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "compressed.h2drumkit")
+
+	// Create a tar archive.
+	var tarBuf bytes.Buffer
+	w := tar.NewWriter(&tarBuf)
+	// Write a directory entry.
+	if err := w.WriteHeader(&tar.Header{Name: "testKit/", Typeflag: tar.TypeDir, Mode: 0o755}); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	// Write drumkit.xml inside the folder.
+	hdr := &tar.Header{
+		Name: "testKit/drumkit.xml",
+		Mode: 0o644,
+		Size: int64(len(drumkitXML)),
+	}
+	if err := w.WriteHeader(hdr); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	if _, err := w.Write([]byte(drumkitXML)); err != nil {
+		t.Fatalf("write data: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close tar: %v", err)
+	}
+
+	// Compress the tar archive with gzip.
+	var gzipBuf bytes.Buffer
+	gz := gzip.NewWriter(&gzipBuf)
+	if _, err := gz.Write(tarBuf.Bytes()); err != nil {
+		t.Fatalf("gzip write: %v", err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatalf("gzip close: %v", err)
+	}
+
+	if err := os.WriteFile(path, gzipBuf.Bytes(), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	artifacts, errs := scanner.Scan(tmpDir, "", nil)
+	if len(errs) != 0 {
+		t.Fatalf("scan errors: %v", errs)
+	}
+	if len(artifacts) != 1 {
+		t.Fatalf("artifact count: got %d, want 1", len(artifacts))
+	}
+
+	meta, ok := artifacts[0].Metadata.(*model.DrumkitMetadata)
+	if !ok {
+		t.Fatalf("metadata type: got %T, want *model.DrumkitMetadata", artifacts[0].Metadata)
+	}
+	if meta.FolderName != "testKit" {
+		t.Errorf("FolderName = %q, want %q", meta.FolderName, "testKit")
 	}
 }
 

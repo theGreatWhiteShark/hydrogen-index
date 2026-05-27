@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - The git commit id of the sources and be included using `go build -ldflags "-X
   github.com/hydrogen-music/hydrogen-index/internal/model.GitCommit=$(git
   rev-parse --short HEAD)"`.
+- Add support for Gzip-compressed `.h2drumkit` files.
 
 ### Changed
 

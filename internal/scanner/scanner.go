@@ -5,6 +5,7 @@ package scanner
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -183,7 +184,13 @@ func parseDrumkitTar(path, root string) (*ArtifactFile, error) {
 //   - There must be exactly one top-level folder across all entries
 //   - drumkit.xml must be present somewhere in the archive
 func findAndParseDrumkitXML(r io.Reader) (interface{}, error) {
-	tr := tar.NewReader(r)
+	// Detect and decompress gzip if present.
+	tarReader, err := maybeDecompressGzip(r)
+	if err != nil {
+		return nil, fmt.Errorf("decompress: %w", err)
+	}
+
+	tr := tar.NewReader(tarReader)
 	topLevelFolders := make(map[string]struct{})
 	var drumkitData []byte
 
@@ -242,6 +249,31 @@ func findAndParseDrumkitXML(r io.Reader) (interface{}, error) {
 	}
 	meta.FolderName = folderName
 	return meta, nil
+}
+
+// maybeDecompressGzip checks if the reader contains gzip-compressed data
+// and returns an appropriate reader. If the data is gzip-compressed,
+// it returns a gzip reader; otherwise, it returns the original reader.
+func maybeDecompressGzip(r io.Reader) (io.Reader, error) {
+	// Peek at the first two bytes to check for gzip magic number.
+	buf := make([]byte, 2)
+	n, err := io.ReadFull(r, buf)
+	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
+		return nil, fmt.Errorf("peek header: %w", err)
+	}
+
+	// Gzip magic number is 0x1f 0x8b.
+	if n >= 2 && buf[0] == 0x1f && buf[1] == 0x8b {
+		// Create a reader that combines the peeked bytes with the rest of the stream.
+		gzipReader, err := gzip.NewReader(io.MultiReader(bytes.NewReader(buf[:n]), r))
+		if err != nil {
+			return nil, fmt.Errorf("gzip reader: %w", err)
+		}
+		return gzipReader, nil
+	}
+
+	// Not gzip, return the original reader with the peeked bytes prepended.
+	return io.MultiReader(bytes.NewReader(buf[:n]), r), nil
 }
 
 // relURL computes the URL-style relative path from root to path.
