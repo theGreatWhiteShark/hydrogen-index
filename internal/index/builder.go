@@ -2,6 +2,7 @@
 package index
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -44,19 +45,27 @@ func Build(artifacts []scanner.ArtifactFile) (*model.Index, error) {
 }
 
 // Finalize serializes the Index to JSON and computes the self-hash.
-// The hash is SHA-256 of the JSON with the "hash" field set to "".
-// Returns the final JSON bytes (with trailing newline) ready to write to disk.
+// The hash is SHA-256 of the compact JSON with the "hash" field removed.
+// This matches the C++ parser in OnlineImporter.cpp which removes the hash
+// key and re-serializes with QJsonDocument::Compact before hashing.
+// Returns the final JSON bytes (indented, with trailing newline) ready to
+// write to disk.
 func Finalize(idx *model.Index) ([]byte, error) {
 	// Canonicalize: hash field must be empty before computing the digest so
 	// that the hash is stable regardless of what the caller set it to.
 	idx.Hash = ""
 
-	preliminary, err := marshalIndented(idx)
+	// Marshal compactly to get deterministic key ordering (struct field order)
+	compact, err := json.Marshal(idx)
 	if err != nil {
 		return nil, fmt.Errorf("marshal for hashing: %w", err)
 	}
 
-	digest := sha256.Sum256(preliminary)
+	// Remove the ,"hash":"" key-value pair to match C++ parser behavior
+	// (QJsonObject::remove("hash") + QJsonDocument::Compact)
+	dataWithoutHash := bytes.Replace(compact, []byte(`,"hash":""`), nil, 1)
+
+	digest := sha256.Sum256(dataWithoutHash)
 	idx.Hash = hex.EncodeToString(digest[:])
 
 	final, err := marshalIndented(idx)

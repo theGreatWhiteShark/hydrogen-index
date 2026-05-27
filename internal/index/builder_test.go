@@ -1,6 +1,9 @@
 package index
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -246,6 +249,50 @@ func TestFinalize_HashPopulated(t *testing.T) {
 	}
 }
 
+// TestFinalize_HashMatchesCompact verifies that the hash computed by Finalize
+// is SHA-256 of the compact JSON with the "hash" key removed. This matches the
+// C++ parser in OnlineImporter.cpp which does:
+//
+//	rootWithoutHash = root; rootWithoutHash.remove("hash");
+//	dataWithoutHash = QJsonDocument(rootWithoutHash).toJson(QJsonDocument::Compact);
+//	hash = sha256(dataWithoutHash)
+func TestFinalize_HashMatchesCompact(t *testing.T) {
+	idx, err := Build(sampleArtifacts())
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	data, err := Finalize(idx)
+	if err != nil {
+		t.Fatalf("Finalize: %v", err)
+	}
+
+	// Parse the finalized JSON
+	var parsed model.Index
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	gotHash := parsed.Hash
+
+	// Compute expected hash: compact JSON with hash key removed
+	parsed.Hash = ""
+	compact, err := json.Marshal(&parsed)
+	if err != nil {
+		t.Fatalf("compact marshal: %v", err)
+	}
+
+	// Remove the ,"hash":"" key-value pair (hash is last field in struct)
+	compactNoHash := bytes.Replace(compact, []byte(`,"hash":""`), nil, 1)
+
+	expectedHash := sha256.Sum256(compactNoHash)
+	expectedHashHex := hex.EncodeToString(expectedHash[:])
+
+	if gotHash != expectedHashHex {
+		t.Errorf("hash mismatch:\n  got:      %s\n  expected: %s\n  compact:  %s", gotHash, expectedHashHex, compactNoHash)
+	}
+}
+
 func TestFinalize_Roundtrip(t *testing.T) {
 	idx, err := Build(sampleArtifacts())
 	if err != nil {
@@ -333,8 +380,8 @@ func TestBuild_URLWithBaseURL(t *testing.T) {
 			BaseURL: "https://raw.githubusercontent.com/user/repo/main",
 			Hash:    "abc",
 			Metadata: &model.PatternMetadata{
-				Name:  "Boom",
-				Tags:  []string{},
+				Name: "Boom",
+				Tags: []string{},
 			},
 		},
 	}
@@ -356,8 +403,8 @@ func TestBuild_URLWithoutBaseURL(t *testing.T) {
 			BaseURL: "",
 			Hash:    "def",
 			Metadata: &model.DrumkitMetadata{
-				Name:  "Kit",
-				Tags:  []string{},
+				Name: "Kit",
+				Tags: []string{},
 			},
 		},
 	}

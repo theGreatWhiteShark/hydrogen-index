@@ -16,6 +16,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   permalink URLs in `index.json`.
 - Provider presets for GitHub and GitLab raw-file URL generation.
 
+### Changed
+
+- Calculation of top-level HASH was changed in order to the C++ counter part to
+  properly parse it.
+
 ### Removed
 
 - Support for standalone `drumkit.xml` files. Only `.h2drumkit` archives are now
