@@ -181,7 +181,7 @@ func parseDrumkitTar(path, root string) (*ArtifactFile, error) {
 //
 // Validation rules:
 //   - Every entry must be inside a top-level folder (no root-level files)
-//   - There must be exactly one top-level folder across all entries
+//   - There must be exactly one top-level folder across all entries (excluding ignored entries)
 //   - drumkit.xml must be present somewhere in the archive
 func findAndParseDrumkitXML(r io.Reader) (interface{}, error) {
 	// Detect and decompress gzip if present.
@@ -207,9 +207,20 @@ func findAndParseDrumkitXML(r io.Reader) (interface{}, error) {
 		slashIdx := strings.Index(hdr.Name, "/")
 		if slashIdx == -1 {
 			// Entry is at root level (no containing folder).
+			// Check if it's an ignored auxiliary file.
+			if isIgnoredTopLevelEntry(hdr.Name) {
+				continue
+			}
 			return nil, fmt.Errorf("archive contains top-level entry %q; expected all entries within a single top-level folder", hdr.Name)
 		}
-		topLevelFolders[hdr.Name[:slashIdx]] = struct{}{}
+		topLevelFolder := hdr.Name[:slashIdx]
+
+		// Skip ignored top-level folders.
+		if isIgnoredTopLevelEntry(topLevelFolder) {
+			continue
+		}
+
+		topLevelFolders[topLevelFolder] = struct{}{}
 
 		// Buffer drumkit.xml content for later parsing.
 		if filepath.Base(hdr.Name) == "drumkit.xml" && hdr.Typeflag == tar.TypeReg {
@@ -274,6 +285,66 @@ func maybeDecompressGzip(r io.Reader) (io.Reader, error) {
 
 	// Not gzip, return the original reader with the peeked bytes prepended.
 	return io.MultiReader(bytes.NewReader(buf[:n]), r), nil
+}
+
+// isIgnoredTopLevelEntry checks if a top-level entry should be ignored
+// during validation. This includes common OS auxiliary files and directories
+// that may be accidentally included in archives.
+func isIgnoredTopLevelEntry(name string) bool {
+	// Ignore "." which represents the archive root
+	if name == "." {
+		return true
+	}
+
+	// macOS auxiliary files and directories
+	if name == ".DS_Store" || name == ".Trashes" || name == ".fseventsd" ||
+		name == ".Spotlight-V100" || name == ".TemporaryItems" ||
+		name == ".VolumeIcon.icns" || name == ".com.apple.timemachine.donotpresent" {
+		return true
+	}
+
+	// macOS Apple Double files (resource forks)
+	if strings.HasPrefix(name, "._") {
+		return true
+	}
+
+	// Windows auxiliary files and directories
+	if name == "Thumbs.db" || name == "desktop.ini" || name == "$RECYCLE.BIN" ||
+		name == "System Volume Information" {
+		return true
+	}
+
+	// Linux auxiliary files and directories
+	if name == ".directory" || strings.HasPrefix(name, ".nfs") {
+		return true
+	}
+
+	// Version control directories
+	if name == ".git" || name == ".svn" || name == ".hg" || name == ".bzr" ||
+		name == ".CVS" || name == ".gitignore" || name == ".gitattributes" {
+		return true
+	}
+
+	// IDE and editor metadata
+	if name == ".idea" || name == ".vscode" || name == ".eclipse" ||
+		name == ".metadata" || name == ".project" || name == ".settings" ||
+		name == ".vs" {
+		return true
+	}
+
+	// Build and dependency directories
+	if name == "node_modules" || name == ".gradle" || name == "target" ||
+		name == "build" || name == "dist" || name == "vendor" {
+		return true
+	}
+
+	// Other common auxiliary files
+	if name == ".gitkeep" || name == ".gitattributes" || name == ".gitmodules" ||
+		name == ".editorconfig" || name == ".eslintignore" || name == ".prettierrc" {
+		return true
+	}
+
+	return false
 }
 
 // relURL computes the URL-style relative path from root to path.

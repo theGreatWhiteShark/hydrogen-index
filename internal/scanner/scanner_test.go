@@ -303,6 +303,175 @@ func TestScanDrumkitTarGzip(t *testing.T) {
 	}
 }
 
+// TestScanDrumkitTarWithIgnoredFiles verifies that archives with ignored
+// auxiliary files at the top level are still parsed correctly.
+func TestScanDrumkitTarWithIgnoredFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "with-ignored.h2drumkit")
+
+	var buf bytes.Buffer
+	w := tar.NewWriter(&buf)
+
+	// Write ignored macOS Apple Double file at root level.
+	if err := w.WriteHeader(&tar.Header{Name: "._testKit", Mode: 0o644, Size: 0}); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	// Write .DS_Store at root level.
+	if err := w.WriteHeader(&tar.Header{Name: ".DS_Store", Mode: 0o644, Size: 0}); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	// Write Thumbs.db at root level.
+	if err := w.WriteHeader(&tar.Header{Name: "Thumbs.db", Mode: 0o644, Size: 0}); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+
+	// Write the actual drumkit folder.
+	if err := w.WriteHeader(&tar.Header{Name: "testKit/", Typeflag: tar.TypeDir, Mode: 0o755}); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	// Write drumkit.xml inside the folder.
+	hdr := &tar.Header{
+		Name: "testKit/drumkit.xml",
+		Mode: 0o644,
+		Size: int64(len(drumkitXML)),
+	}
+	if err := w.WriteHeader(hdr); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	if _, err := w.Write([]byte(drumkitXML)); err != nil {
+		t.Fatalf("write data: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close tar: %v", err)
+	}
+
+	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	artifacts, errs := scanner.Scan(tmpDir, "", nil)
+	if len(errs) != 0 {
+		t.Fatalf("scan errors: %v", errs)
+	}
+	if len(artifacts) != 1 {
+		t.Fatalf("artifact count: got %d, want 1", len(artifacts))
+	}
+
+	meta, ok := artifacts[0].Metadata.(*model.DrumkitMetadata)
+	if !ok {
+		t.Fatalf("metadata type: got %T, want *model.DrumkitMetadata", artifacts[0].Metadata)
+	}
+	if meta.FolderName != "testKit" {
+		t.Errorf("FolderName = %q, want %q", meta.FolderName, "testKit")
+	}
+}
+
+// TestScanDrumkitTarWithIgnoredFolders verifies that archives with ignored
+// auxiliary folders at the top level are still parsed correctly.
+func TestScanDrumkitTarWithIgnoredFolders(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "with-ignored-folders.h2drumkit")
+
+	var buf bytes.Buffer
+	w := tar.NewWriter(&buf)
+
+	// Write ignored .git folder at root level.
+	if err := w.WriteHeader(&tar.Header{Name: ".git/", Typeflag: tar.TypeDir, Mode: 0o755}); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	// Write ignored node_modules folder at root level.
+	if err := w.WriteHeader(&tar.Header{Name: "node_modules/", Typeflag: tar.TypeDir, Mode: 0o755}); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+
+	// Write the actual drumkit folder.
+	if err := w.WriteHeader(&tar.Header{Name: "testKit/", Typeflag: tar.TypeDir, Mode: 0o755}); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	// Write drumkit.xml inside the folder.
+	hdr := &tar.Header{
+		Name: "testKit/drumkit.xml",
+		Mode: 0o644,
+		Size: int64(len(drumkitXML)),
+	}
+	if err := w.WriteHeader(hdr); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	if _, err := w.Write([]byte(drumkitXML)); err != nil {
+		t.Fatalf("write data: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close tar: %v", err)
+	}
+
+	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	artifacts, errs := scanner.Scan(tmpDir, "", nil)
+	if len(errs) != 0 {
+		t.Fatalf("scan errors: %v", errs)
+	}
+	if len(artifacts) != 1 {
+		t.Fatalf("artifact count: got %d, want 1", len(artifacts))
+	}
+
+	meta, ok := artifacts[0].Metadata.(*model.DrumkitMetadata)
+	if !ok {
+		t.Fatalf("metadata type: got %T, want *model.DrumkitMetadata", artifacts[0].Metadata)
+	}
+	if meta.FolderName != "testKit" {
+		t.Errorf("FolderName = %q, want %q", meta.FolderName, "testKit")
+	}
+}
+
+// TestScanDrumkitTarWithNonIgnoredTopLevelFile verifies that archives with
+// non-ignored files at the top level still produce an error.
+func TestScanDrumkitTarWithNonIgnoredTopLevelFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "bad.h2drumkit")
+
+	var buf bytes.Buffer
+	w := tar.NewWriter(&buf)
+
+	// Write a non-ignored file at root level.
+	if err := w.WriteHeader(&tar.Header{Name: "readme.txt", Mode: 0o644, Size: 4}); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	if _, err := io.WriteString(w, "test"); err != nil {
+		t.Fatalf("write data: %v", err)
+	}
+
+	// Write the actual drumkit folder.
+	if err := w.WriteHeader(&tar.Header{Name: "testKit/", Typeflag: tar.TypeDir, Mode: 0o755}); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	// Write drumkit.xml inside the folder.
+	hdr := &tar.Header{
+		Name: "testKit/drumkit.xml",
+		Mode: 0o644,
+		Size: int64(len(drumkitXML)),
+	}
+	if err := w.WriteHeader(hdr); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+	if _, err := w.Write([]byte(drumkitXML)); err != nil {
+		t.Fatalf("write data: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close tar: %v", err)
+	}
+
+	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	_, errs := scanner.Scan(tmpDir, "", nil)
+	if len(errs) == 0 {
+		t.Fatal("expected error for archive with non-ignored top-level file, got none")
+	}
+}
+
 // TestScanBaseURL verifies that the BaseURL is set on all artifacts when
 // provided to Scan.
 func TestScanBaseURL(t *testing.T) {

@@ -14,11 +14,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   `.h2drumkit` tar archive structure).
 - `--base-url`, `--provider`, `--repo`, and `--branch` flags for constructing
   permalink URLs in `index.json`.
-- Provider presets for GitHub and GitLab raw-file URL generation.
+- Provider presets for GitHub and Gitlab raw-file URL generation.
 - The git commit id of the sources and be included using `go build -ldflags "-X
   github.com/hydrogen-music/hydrogen-index/internal/model.GitCommit=$(git
   rev-parse --short HEAD)"`.
 - Add support for Gzip-compressed `.h2drumkit` files.
+- `.h2drumkit` files must only contain a single folder on top-level. This one
+  will be installed in the user's data folder. Though, most OS auxiliary files
+  are tolerated for backward compatibility.
 
 ### Changed
 
