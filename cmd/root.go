@@ -28,7 +28,7 @@ func buildRootCmd() *cobra.Command {
 		// RunE delegates to scan so `hydrogen-index` with no subcommand behaves
 		// identically to `hydrogen-index scan`.
 		RunE:    runScan,
-		Version: model.Version,
+		Version: model.VersionString(),
 	}
 
 	// Custom template keeps the version output consistent with the spec:

@@ -15,6 +15,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - `--base-url`, `--provider`, `--repo`, and `--branch` flags for constructing
   permalink URLs in `index.json`.
 - Provider presets for GitHub and GitLab raw-file URL generation.
+- The git commit id of the sources and be included using `go build -ldflags "-X
+  github.com/hydrogen-music/hydrogen-index/internal/model.GitCommit=$(git
+  rev-parse --short HEAD)"`.
 
 ### Changed
 

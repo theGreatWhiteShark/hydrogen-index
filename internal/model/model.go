@@ -4,9 +4,21 @@
 // and the output index.json structure defined in MADR 0002.
 package model
 
-// Version is the current hydrogen-index version, used both for --version
-// output and the "version" field in generated index.json files.
-const Version = "0.1.0"
+// Version is the semantic version. Set via -ldflags at build time.
+// Default value used when building without ldflags (e.g., `go run`).
+var Version = "0.1.0"
+
+// GitCommit is the short git commit hash. Set via -ldflags at build time.
+var GitCommit = ""
+
+// VersionString returns the user-facing version string, appending the git
+// commit hash when available for reproducibility.
+func VersionString() string {
+	if GitCommit != "" {
+		return Version + "+" + GitCommit
+	}
+	return Version
+}
 
 // ArtifactType identifies which category of Hydrogen artifact a file belongs to.
 type ArtifactType string
@@ -20,15 +32,15 @@ const (
 // Index is the top-level structure of the generated index.json file.
 // See MADR 0002 for the full specification.
 type Index struct {
-	Version      string           `json:"version"`
-	Created      string           `json:"created"`
-	PatternCount int              `json:"patternCount"`
-	SongCount    int              `json:"songCount"`
-	DrumkitCount int              `json:"drumkitCount"`
-	Patterns     []PatternEntry   `json:"patterns"`
-	Songs        []SongEntry      `json:"songs"`
-	Drumkits     []DrumkitEntry   `json:"drumkits"`
-	Hash         string           `json:"hash"`
+	Version      string         `json:"version"`
+	Created      string         `json:"created"`
+	PatternCount int            `json:"patternCount"`
+	SongCount    int            `json:"songCount"`
+	DrumkitCount int            `json:"drumkitCount"`
+	Patterns     []PatternEntry `json:"patterns"`
+	Songs        []SongEntry    `json:"songs"`
+	Drumkits     []DrumkitEntry `json:"drumkits"`
+	Hash         string         `json:"hash"`
 }
 
 // SharedFields contains the fields common to all artifact entries in the index.
@@ -89,15 +101,15 @@ type DrumkitMetadata struct {
 
 // PatternMetadata holds metadata extracted from a pattern XML file.
 type PatternMetadata struct {
-	Name          string
-	Author        string
-	Info          string
-	License       string
-	FormatVersion int
-	UserVersion   int
-	Tags          []string
-	Category      string
-	Notes         int
+	Name            string
+	Author          string
+	Info            string
+	License         string
+	FormatVersion   int
+	UserVersion     int
+	Tags            []string
+	Category        string
+	Notes           int
 	InstrumentTypes []string
 }
 
