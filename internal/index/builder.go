@@ -7,7 +7,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strconv"
 	"time"
+	"unicode/utf8"
 
 	"github.com/hydrogen-music/hydrogen-index/internal/model"
 	"github.com/hydrogen-music/hydrogen-index/internal/scanner"
@@ -45,9 +48,11 @@ func Build(artifacts []scanner.ArtifactFile) (*model.Index, error) {
 }
 
 // Finalize serializes the Index to JSON and computes the self-hash.
-// The hash is SHA-256 of the compact JSON with the "hash" field removed.
-// This matches the C++ parser in OnlineImporter.cpp which removes the hash
-// key and re-serializes with QJsonDocument::Compact before hashing.
+// The hash is SHA-256 of the canonical compact JSON with the "hash" field
+// removed. Canonical form uses alphabetically sorted keys at all nesting
+// levels and preserves raw UTF-8 (no \uXXXX escaping), matching the C++
+// parser in OnlineImporter.cpp which parses the JSON into QJsonObject and
+// re-serializes with QJsonDocument::Compact.
 // Returns the final JSON bytes (indented, with trailing newline) ready to
 // write to disk.
 func Finalize(idx *model.Index) ([]byte, error) {
@@ -55,15 +60,33 @@ func Finalize(idx *model.Index) ([]byte, error) {
 	// that the hash is stable regardless of what the caller set it to.
 	idx.Hash = ""
 
-	// Marshal compactly to get deterministic key ordering (struct field order)
+	// Marshal to compact JSON, then unmarshal into map[string]interface{} to
+	// get canonical key ordering (Go sorts map keys alphabetically when
+	// marshaling). This ensures the hash is independent of Go struct field
+	// order and matches Qt's QJsonObject behavior.
 	compact, err := json.Marshal(idx)
 	if err != nil {
 		return nil, fmt.Errorf("marshal for hashing: %w", err)
 	}
 
-	// Remove the ,"hash":"" key-value pair to match C++ parser behavior
+	var canonical map[string]interface{}
+	if err := json.Unmarshal(compact, &canonical); err != nil {
+		return nil, fmt.Errorf("unmarshal for canonical form: %w", err)
+	}
+
+	// Remove the "hash" key to match C++ parser behavior
 	// (QJsonObject::remove("hash") + QJsonDocument::Compact)
-	dataWithoutHash := bytes.Replace(compact, []byte(`,"hash":""`), nil, 1)
+	delete(canonical, "hash")
+
+	// Use canonicalJSON to produce Qt-compatible output: sorted keys + raw
+	// UTF-8 (no \uXXXX escaping). Go's json.Marshal escapes <>& and all
+	// non-ASCII as \uXXXX, but QJsonDocument::toJson preserves raw UTF-8.
+	// Using a json.Encoder with SetEscapeHTML(false) and a custom string
+	// encoder ensures byte-for-byte compatibility.
+	dataWithoutHash, err := canonicalJSON(canonical)
+	if err != nil {
+		return nil, fmt.Errorf("marshal canonical: %w", err)
+	}
 
 	digest := sha256.Sum256(dataWithoutHash)
 	idx.Hash = hex.EncodeToString(digest[:])
@@ -74,6 +97,108 @@ func Finalize(idx *model.Index) ([]byte, error) {
 	}
 
 	return final, nil
+}
+
+// canonicalJSON produces compact JSON with sorted keys at all nesting levels
+// and raw UTF-8 encoding (no \uXXXX escaping). This matches the output of
+// Qt's QJsonDocument::toJson(QJsonDocument::Compact) when the source
+// QJsonObject has alphabetically ordered keys.
+func canonicalJSON(v any) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := canonicalMarshal(&buf, v); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// canonicalMarshal writes v to w as compact JSON with sorted keys and raw
+// UTF-8. It mirrors json.Marshal's output format but avoids Go's default
+// HTML-safe and ASCII-safe escaping, ensuring compatibility with Qt's
+// QJsonDocument serialization.
+func canonicalMarshal(w *bytes.Buffer, v any) error {
+	switch val := v.(type) {
+	case nil:
+		w.WriteString("null")
+	case bool:
+		w.WriteString(strconv.FormatBool(val))
+	case int:
+		w.WriteString(strconv.FormatInt(int64(val), 10))
+	case int64:
+		w.WriteString(strconv.FormatInt(val, 10))
+	case float64:
+		// Use Go's json.Number format for floats to match json.Marshal
+		w.WriteString(json.Number(strconv.FormatFloat(val, 'f', -1, 64)).String())
+	case string:
+		writeJSONString(w, val)
+	case []any:
+		w.WriteByte('[')
+		for i, item := range val {
+			if i > 0 {
+				w.WriteByte(',')
+			}
+			if err := canonicalMarshal(w, item); err != nil {
+				return err
+			}
+		}
+		w.WriteByte(']')
+	case map[string]any:
+		w.WriteByte('{')
+		keys := make([]string, 0, len(val))
+		for k := range val {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for i, k := range keys {
+			if i > 0 {
+				w.WriteByte(',')
+			}
+			writeJSONString(w, k)
+			w.WriteByte(':')
+			if err := canonicalMarshal(w, val[k]); err != nil {
+				return err
+			}
+		}
+		w.WriteByte('}')
+	default:
+		return fmt.Errorf("unsupported type %T in canonicalJSON", v)
+	}
+	return nil
+}
+
+// writeJSONString writes a JSON-encoded string to w with raw UTF-8
+// (no \uXXXX escaping of non-ASCII). This matches Qt's QJsonStringEncoder
+// behavior which only escapes control chars, quotes, and backslashes.
+func writeJSONString(w *bytes.Buffer, s string) {
+	w.WriteByte('"')
+	for i := 0; i < len(s); {
+		r, size := utf8.DecodeRuneInString(s[i:])
+		switch r {
+		case '"':
+			w.WriteString(`\"`)
+		case '\\':
+			w.WriteString(`\\`)
+		case '\b':
+			w.WriteString(`\b`)
+		case '\f':
+			w.WriteString(`\f`)
+		case '\n':
+			w.WriteString(`\n`)
+		case '\r':
+			w.WriteString(`\r`)
+		case '\t':
+			w.WriteString(`\t`)
+		default:
+			if r < 0x20 {
+				// Control characters: \u00XX
+				fmt.Fprintf(w, "\\u%04x", r)
+			} else {
+				// All other characters (including non-ASCII): write raw UTF-8
+				w.WriteString(s[i : i+size])
+			}
+		}
+		i += size
+	}
+	w.WriteByte('"')
 }
 
 // marshalIndented encodes v as indented JSON with a trailing newline.

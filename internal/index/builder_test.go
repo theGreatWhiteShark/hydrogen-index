@@ -1,7 +1,6 @@
 package index
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -250,12 +249,10 @@ func TestFinalize_HashPopulated(t *testing.T) {
 }
 
 // TestFinalize_HashMatchesCompact verifies that the hash computed by Finalize
-// is SHA-256 of the compact JSON with the "hash" key removed. This matches the
-// C++ parser in OnlineImporter.cpp which does:
-//
-//	rootWithoutHash = root; rootWithoutHash.remove("hash");
-//	dataWithoutHash = QJsonDocument(rootWithoutHash).toJson(QJsonDocument::Compact);
-//	hash = sha256(dataWithoutHash)
+// is SHA-256 of the canonical compact JSON with the "hash" key removed.
+// Canonical form uses alphabetically sorted keys at all nesting levels,
+// matching the C++ parser in OnlineImporter.cpp which parses the JSON into
+// QJsonObject and re-serializes with QJsonDocument::Compact.
 func TestFinalize_HashMatchesCompact(t *testing.T) {
 	idx, err := Build(sampleArtifacts())
 	if err != nil {
@@ -275,21 +272,30 @@ func TestFinalize_HashMatchesCompact(t *testing.T) {
 
 	gotHash := parsed.Hash
 
-	// Compute expected hash: compact JSON with hash key removed
+	// Compute expected hash using the same canonical approach: marshal to
+	// map[string]interface{} for sorted keys, then remove "hash" key.
 	parsed.Hash = ""
 	compact, err := json.Marshal(&parsed)
 	if err != nil {
 		t.Fatalf("compact marshal: %v", err)
 	}
 
-	// Remove the ,"hash":"" key-value pair (hash is last field in struct)
-	compactNoHash := bytes.Replace(compact, []byte(`,"hash":""`), nil, 1)
+	var canonical map[string]interface{}
+	if err := json.Unmarshal(compact, &canonical); err != nil {
+		t.Fatalf("unmarshal for canonical: %v", err)
+	}
+	delete(canonical, "hash")
 
-	expectedHash := sha256.Sum256(compactNoHash)
+	canonicalBytes, err := json.Marshal(canonical)
+	if err != nil {
+		t.Fatalf("marshal canonical: %v", err)
+	}
+
+	expectedHash := sha256.Sum256(canonicalBytes)
 	expectedHashHex := hex.EncodeToString(expectedHash[:])
 
 	if gotHash != expectedHashHex {
-		t.Errorf("hash mismatch:\n  got:      %s\n  expected: %s\n  compact:  %s", gotHash, expectedHashHex, compactNoHash)
+		t.Errorf("hash mismatch:\n  got:      %s\n  expected: %s\n  canonical: %s", gotHash, expectedHashHex, canonicalBytes)
 	}
 }
 
@@ -415,5 +421,66 @@ func TestBuild_URLWithoutBaseURL(t *testing.T) {
 	want := "drumkits/kit.h2drumkit"
 	if idx.Drumkits[0].URL != want {
 		t.Errorf("URL = %q, want %q", idx.Drumkits[0].URL, want)
+	}
+}
+
+// TestFinalize_CrossPlatformHash verifies that the hash computed by Finalize
+// matches what the C++ OnlineImporter.cpp parser would compute when it:
+//  1. Parses the finalized JSON into QJsonObject
+//  2. Removes the "hash" key
+//  3. Re-serializes with QJsonDocument::Compact
+//
+// Qt 5 QJsonObject iterates keys in alphabetical order. Qt 6 preserves
+// insertion order — but since our canonical form writes sorted keys,
+// parsing and re-serializing in Qt 6 also yields sorted keys.
+//
+// This test simulates the C++ behavior by unmarshaling into
+// map[string]interface{} (which sorts keys alphabetically when marshaling
+// back), then hashing — exactly what the C++ side does.
+func TestFinalize_CrossPlatformHash(t *testing.T) {
+	idx, err := Build(sampleArtifacts())
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	data, err := Finalize(idx)
+	if err != nil {
+		t.Fatalf("Finalize: %v", err)
+	}
+
+	// Simulate C++ OnlineImporter::parseIndex behavior:
+	// 1. Parse JSON into QJsonObject (map[string]interface{} in Go)
+	var root map[string]interface{}
+	if err := json.Unmarshal(data, &root); err != nil {
+		t.Fatalf("unmarshal finalized JSON: %v", err)
+	}
+
+	// 2. Extract expected hash from top-level
+	sExpectedHash, ok := root["hash"].(string)
+	if !ok || sExpectedHash == "" {
+		t.Fatal("expected 'hash' field in finalized JSON")
+	}
+
+	// 3. Remove "hash" key (QJsonObject::remove("hash"))
+	delete(root, "hash")
+
+	// 4. Re-serialize to compact JSON (QJsonDocument::Compact)
+	// map[string]interface{} marshals with sorted keys
+	dataWithoutHash, err := json.Marshal(root)
+	if err != nil {
+		t.Fatalf("marshal without hash: %v", err)
+	}
+
+	// 5. Compute SHA-256 of compact JSON
+	sComputedHash := sha256.Sum256(dataWithoutHash)
+	sComputedHashHex := hex.EncodeToString(sComputedHash[:])
+
+	// 6. Verify match (this is the assertion that would fail before the fix)
+	if sComputedHashHex != sExpectedHash {
+		t.Errorf("Cross-platform hash mismatch (simulating C++ QJsonObject behavior):\n"+
+			"  Expected (from index): %s\n"+
+			"  Computed (sorted keys): %s\n"+
+			"  Compact JSON: %s",
+			sExpectedHash, sComputedHashHex, dataWithoutHash)
 	}
 }

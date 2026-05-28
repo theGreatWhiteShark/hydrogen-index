@@ -25,8 +25,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 
-- Calculation of top-level HASH was changed in order to the C++ counter part to
-  properly parse it.
+- Top-level hash computation now uses canonical JSON with alphabetically sorted
+  keys at all nesting levels, ensuring the SHA-256 digest matches what the C++
+  OnlineImporter computes when re-serializing with `QJsonDocument::Compact`
+  (Qt 5: alphabetical key order; Qt 6: insertion order, but sorted input
+  preserves alphabetical order).
 
 ### Fixed
 
